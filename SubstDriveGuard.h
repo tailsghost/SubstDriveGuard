@@ -1,4 +1,7 @@
-﻿#pragma once
+﻿#include <string>
+#include <Windows.h>
+
+#pragma once
 
 
 class SubstDriveGuard {
@@ -8,11 +11,11 @@ public:
 
 	bool Mount(const std::wstring& target) {
 		if (target.empty()) return false;
-		std::wstring norm = target;
+		auto norm = target;
 		if (norm.size() > 1 && (norm.back() == L'\\' || norm.back() == L'/')) norm.pop_back();
 		m_target = norm;
 
-		for (wchar_t L = L'Z'; L >= L'D'; --L) {
+		for (const auto L = L'Z'; L >= L'D'; --L) {
 			if (IsDriveFree(L)) {
 				m_drive = L;
 				break;
@@ -64,7 +67,15 @@ private:
 	bool m_created = false;
 	bool m_usedDefine = false;
 
-	bool IsDriveFree(wchar_t letter) {
+	std::wstring Quote(const std::wstring& s)
+	{
+		if (s.empty()) return L"\"\"";
+		if (s.find(L' ') != std::wstring::npos || s.find(L'"') != std::wstring::npos)
+			return L"\"" + s + L"\"";
+		return s;
+	}
+
+	bool IsDriveFree(const wchar_t letter) {
 		if (letter < L'A' || letter > L'Z') return false;
 		wchar_t root[4] = { letter, L':', L'\\', 0 };
 		UINT type = GetDriveTypeW(root);
@@ -72,37 +83,40 @@ private:
 	}
 
 	bool CreateViaDefineDosDevice(wchar_t drive, const std::wstring& target) {
-		std::wstring raw = L"\\??\\" + target;
-		BOOL r = DefineDosDeviceW(DDD_RAW_TARGET_PATH, (std::wstring(1, drive) + L":").c_str(), raw.c_str());
-		return r != FALSE;
+		auto raw = L"\\??\\" + target;
+		auto result = DefineDosDeviceW(DDD_RAW_TARGET_PATH, (std::wstring(drive) + L":").c_str(), raw.c_str());
+		return result != FALSE;
 	}
 
 	bool RemoveViaDefineDosDevice(wchar_t drive, const std::wstring& target) {
-		std::wstring raw = L"\\??\\" + target;
-		BOOL r = DefineDosDeviceW(DDD_REMOVE_DEFINITION | DDD_EXACT_MATCH_ON_REMOVE, (std::wstring(1, drive) + L":").c_str(), raw.c_str());
-		return r != FALSE;
+		auto raw = L"\\??\\" + target;
+		auto result = DefineDosDeviceW(DDD_REMOVE_DEFINITION | DDD_EXACT_MATCH_ON_REMOVE, (std::wstring(1, drive) + L":").c_str(), raw.c_str());
+		return result != FALSE;
 	}
 
 	bool CreateViaSubstCmd(wchar_t drive, const std::wstring& target) {
-		std::wstring cmd = L"cmd.exe /C subst " + std::wstring(1, drive) + L": " + Quote(target);
+		auto cmd = L"cmd.exe /C subst " + std::wstring(drive) + L": " + Quote(target);
 		STARTUPINFOW si{}; si.cb = sizeof(si);
 		PROCESS_INFORMATION pi{};
-		BOOL ok = CreateProcessW(nullptr, &cmd[0], nullptr, nullptr, FALSE, CREATE_NO_WINDOW, nullptr, nullptr, &si, &pi);
+		auto ok = CreateProcessW(nullptr, &cmd[0], nullptr, nullptr, FALSE, CREATE_NO_WINDOW, nullptr, nullptr, &si, &pi);
 		if (!ok) return false;
 		WaitForSingleObject(pi.hProcess, INFINITE);
-		DWORD ec = 0; GetExitCodeProcess(pi.hProcess, &ec);
-		CloseHandle(pi.hThread); CloseHandle(pi.hProcess);
+		DWORD ec = 0;
+		GetExitCodeProcess(pi.hProcess, &ec);
+		CloseHandle(pi.hThread); 
+		CloseHandle(pi.hProcess);
 		return ec == 0;
 	}
 
 	bool RemoveViaSubstCmd(wchar_t drive) {
-		std::wstring cmd = L"cmd.exe /C subst " + std::wstring(1, drive) + L": /D";
+		auto cmd = L"cmd.exe /C subst " + std::wstring(1, drive) + L": /D";
 		STARTUPINFOW si{}; si.cb = sizeof(si);
 		PROCESS_INFORMATION pi{};
-		BOOL ok = CreateProcessW(nullptr, &cmd[0], nullptr, nullptr, FALSE, CREATE_NO_WINDOW, nullptr, nullptr, &si, &pi);
+		auto ok = CreateProcessW(nullptr, &cmd[0], nullptr, nullptr, FALSE, CREATE_NO_WINDOW, nullptr, nullptr, &si, &pi);
 		if (!ok) return false;
 		WaitForSingleObject(pi.hProcess, INFINITE);
-		DWORD ec = 0; GetExitCodeProcess(pi.hProcess, &ec);
+		DWORD ec = 0; 
+		GetExitCodeProcess(pi.hProcess, &ec);
 		CloseHandle(pi.hThread); CloseHandle(pi.hProcess);
 		return ec == 0;
 	}
