@@ -15,7 +15,7 @@ public:
 		if (norm.size() > 1 && (norm.back() == L'\\' || norm.back() == L'/')) norm.pop_back();
 		m_target = norm;
 
-		for (const auto L = L'Z'; L >= L'D'; --L) {
+		for (wchar_t L = L'Z'; L >= L'D'; --L) {
 			if (IsDriveFree(L)) {
 				m_drive = L;
 				break;
@@ -75,16 +75,16 @@ private:
 		return s;
 	}
 
-	bool IsDriveFree(const wchar_t letter) {
+	bool IsDriveFree(wchar_t letter) {
 		if (letter < L'A' || letter > L'Z') return false;
 		wchar_t root[4] = { letter, L':', L'\\', 0 };
-		UINT type = GetDriveTypeW(root);
+		auto type = GetDriveTypeW(root);
 		return (type == DRIVE_NO_ROOT_DIR) || (type == DRIVE_UNKNOWN);
 	}
 
 	bool CreateViaDefineDosDevice(wchar_t drive, const std::wstring& target) {
 		auto raw = L"\\??\\" + target;
-		auto result = DefineDosDeviceW(DDD_RAW_TARGET_PATH, (std::wstring(drive) + L":").c_str(), raw.c_str());
+		auto result = DefineDosDeviceW(DDD_RAW_TARGET_PATH, (std::wstring(1,drive) + L":").c_str(), raw.c_str());
 		return result != FALSE;
 	}
 
@@ -95,7 +95,7 @@ private:
 	}
 
 	bool CreateViaSubstCmd(wchar_t drive, const std::wstring& target) {
-		auto cmd = L"cmd.exe /C subst " + std::wstring(drive) + L": " + Quote(target);
+		auto cmd = L"cmd.exe /C subst " + std::wstring(1,drive) + L": " + Quote(target);
 		STARTUPINFOW si{}; si.cb = sizeof(si);
 		PROCESS_INFORMATION pi{};
 		auto ok = CreateProcessW(nullptr, &cmd[0], nullptr, nullptr, FALSE, CREATE_NO_WINDOW, nullptr, nullptr, &si, &pi);
